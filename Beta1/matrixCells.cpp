@@ -20,10 +20,10 @@ namespace matrixMapp {
     matrixCells::matrixCells(int n, double size, double cutoff_radius) :
             // Main parameters are initialized
             // Number of rows of the matrix
-            nrows(ceil(sqrt(n))),
+            nrows(ceil(sqrt(n) / 2)),
 
             // Number of columns
-            ncols(ceil(sqrt(n))),
+            ncols(ceil(sqrt(n) / 2)),
 
             // Total size of the matrix
             msize(size / nrows),
