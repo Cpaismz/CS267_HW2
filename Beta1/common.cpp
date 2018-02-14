@@ -1,23 +1,16 @@
-#include <stdlib.h>
-#include <stdio.h>
+#include "common.h"
+#include "matrixCells.h"
 #include <assert.h>
 #include <float.h>
-#include <string.h>
+#include <iostream>
 #include <math.h>
-#include <time.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <sys/time.h>
-#include "common.h"
+#include <time.h>
 
 double size;
-
-//
-//  tuned constants
-//
-#define density 0.0005
-#define mass    0.01
-#define cutoff  0.01
-#define min_r   (cutoff/100)
-#define dt      0.0005
 
 //
 //  timer
@@ -47,18 +40,18 @@ void set_size( int n )
 //
 //  Initialize the particle positions and velocities
 //
-void init_particles( int n, particle_t *p )
+void init_particles(int n, particle_t p[])
 {
     srand48( time( NULL ) );
-        
+
     int sx = (int)ceil(sqrt((double)n));
     int sy = (n+sx-1)/sx;
-    
+
     int *shuffle = (int*)malloc( n * sizeof(int) );
     for( int i = 0; i < n; i++ )
         shuffle[i] = i;
-    
-    for( int i = 0; i < n; i++ ) 
+
+    for( int i = 0; i < n; i++ )
     {
         //
         //  make sure particles are not spatially sorted
@@ -66,7 +59,7 @@ void init_particles( int n, particle_t *p )
         int j = lrand48()%(n-i);
         int k = shuffle[j];
         shuffle[j] = shuffle[n-i-1];
-        
+
         //
         //  distribute particles evenly to ensure proper spacing
         //
@@ -82,6 +75,13 @@ void init_particles( int n, particle_t *p )
     free( shuffle );
 }
 
+// Push the generated particles into a matrixCells class object
+void push2Mesh(int n, particle_t p[], matrixMapp::matrixCells* mesh) {
+    for (int i = 0; i < n; ++i) {
+        mesh->insert(p[i]);
+    }
+}
+
 //
 //  interact two particles
 //
@@ -93,19 +93,18 @@ void apply_force( particle_t &particle, particle_t &neighbor , double *dmin, dou
     double r2 = dx * dx + dy * dy;
     if( r2 > cutoff*cutoff )
         return;
-	if (r2 != 0)
+//  CORRECTENES!!!!!!!!!!!!!!!1
+    if (r2 != 0)
         {
 	   if (r2/(cutoff*cutoff) < *dmin * (*dmin))
 	      *dmin = sqrt(r2)/cutoff;
            (*davg) += sqrt(r2)/cutoff;
            (*navg) ++;
         }
-		
-    r2 = fmax( r2, min_r*min_r );
+//  CORRECTENES!!!!!!!!!!!!!!!1
+     r2 = fmax( r2, min_r*min_r );
     double r = sqrt( r2 );
- 
-    
-	
+
     //
     //  very simple short-range repulsive force
     //

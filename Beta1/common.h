@@ -1,6 +1,27 @@
 #ifndef __CS267_COMMON_H__
 #define __CS267_COMMON_H__
 
+#include <stdio.h>
+
+namespace matrixMapp {
+    class matrixCells;
+}
+
+/**
+ * Size of the particle simulation area's sides.
+ */
+extern double size;
+
+//
+//  tuned constants
+//
+#define density 0.0005
+#define mass    0.01
+#define cutoff  0.01
+#define min_r   (cutoff/100)
+#define dt      0.0005
+
+
 inline int min( int a, int b ) { return a < b ? a : b; }
 inline int max( int a, int b ) { return a > b ? a : b; }
 
@@ -13,14 +34,14 @@ const int SAVEFREQ = 10;
 //
 // particle data structure
 //
-typedef struct 
+typedef struct
 {
-  double x;
-  double y;
-  double vx;
-  double vy;
-  double ax;
-  double ay;
+    double x;
+    double y;
+    double vx;
+    double vy;
+    double ax;
+    double ay;
 } particle_t;
 
 //
@@ -32,10 +53,10 @@ double read_timer( );
 //  simulation routines
 //
 void set_size( int n );
-void init_particles( int n, particle_t *p );
+void init_particles( int n, particle_t p[] );
+void push2Mesh(int n, particle_t p[], matrixMapp::matrixCells*);
 void apply_force( particle_t &particle, particle_t &neighbor , double *dmin, double *davg, int *navg);
 void move( particle_t &p );
-
 
 //
 //  I/O routines
