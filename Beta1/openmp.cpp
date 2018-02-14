@@ -52,16 +52,22 @@ int main( int argc, char **argv )
     //  simulate a number of time steps
     //
     double simulation_time = read_timer();
-    int max_locks = 320;
-    int num_entries = min(mesh->get_cols() * mesh->get_rows(), max_locks);
-    omp_lock_t* locks = (omp_lock_t*)malloc(sizeof(omp_lock_t) *  num_entries);
+    omp_lock_t* locks;
+    int num_entries;
     #pragma omp parallel private(dmin)
     {
+        numthreads = omp_get_num_threads();
+        int max_locks = 20 * numthreads;
+        #pragma omp single
+        {
+            num_entries = min(mesh->get_cols() * mesh->get_rows(), max_locks);
+            locks = (omp_lock_t*)malloc(sizeof(omp_lock_t) *  num_entries);
+        }
+        #pragma omp barrier
         #pragma omp for
         for (int i = 0; i < num_entries; i++) {
             omp_init_lock(&locks[i]);
         }
-        numthreads = omp_get_num_threads();
     for( int step = 0; step < NSTEPS ; step++ )
     {
         navg = 0;
@@ -95,36 +101,17 @@ int main( int argc, char **argv )
             int new_index = mesh->get_index(particles[i]);
             if (old_index != new_index) {
                 int lock_old_index = old_index * num_entries / (mesh->get_rows() * mesh->get_cols());
+                int lock_new_index = new_index * num_entries / (mesh->get_rows() * mesh->get_cols());
                 omp_set_lock(&locks[lock_old_index]);
                 mesh->remove(particles[i], old_index);
-                omp_unset_lock(&locks[lock_old_index]);
-
-                int lock_new_index = new_index * num_entries / (mesh->get_rows() * mesh->get_cols());
-                omp_set_lock(&locks[lock_new_index]);
+                if (lock_old_index != lock_new_index) {
+                    omp_unset_lock(&locks[lock_old_index]);
+                    omp_set_lock(&locks[lock_new_index]);
+                }
                 mesh->insert(particles[i]);
                 omp_unset_lock(&locks[lock_new_index]);
             }
-
-            /* 
-            fine grained locking?
-            1) cache location of old particle
-            2) move particle
-            3) get new location
-            4) if bucket_changed:
-                // we can either used fine grained locking or overall locking
-                5) lock old bucket, remove particle, unlock
-                6) lock new bucket, add particle, unlock
-            */
         }
-
-
-        // Update grid hash set.
-       /* 
-        #pragma omp single
-        {
-            mesh->clear();
-            push2Mesh(n, particles, mesh);
-        }*/
 
         if( find_option( argc, argv, "-no" ) == -1 )
         {
