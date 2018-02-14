@@ -1,9 +1,9 @@
 #include "matrixCells.h"
 #include <cassert>
 #include <cmath>
-#include <deque>
 #include <iostream>
 #include <vector>
+#include <algorithm>
 
 // Definition of the newspace associated with the matrix/grid
 namespace matrixMapp {
@@ -31,15 +31,15 @@ namespace matrixMapp {
             // Number of adjacent/neighbor cells
             Nadjacents(ceil(cutoff_radius / msize)) {
 
-                // New vector deque with references
-                cells = new std::vector<std::deque<particle_t *>*>(nrows * ncols);
+                // New vector vector with references
+                cells = new std::vector<std::vector<particle_t *>*>(nrows * ncols);
 
                 // Iterator is initialized
-                std::vector<std::deque<particle_t *>*>::iterator it;
+                std::vector<std::vector<particle_t *>*>::iterator it;
 
                 // Add references
                 for (it = cells->begin(); it != cells->end(); ++it) {
-                    *it = new std::deque<particle_t *>();
+                    *it = new std::vector<particle_t *>();
                 }
             }
 
@@ -47,7 +47,7 @@ namespace matrixMapp {
     // Destructor method: delete the matrix's cells
     matrixCells::~matrixCells() {
         // Delete references (pointers to particles)
-        std::vector<std::deque<particle_t *>*>::iterator it;
+        std::vector<std::vector<particle_t *>*>::iterator it;
         for (it = cells->begin(); it != cells->end(); ++it) {
             delete *it;
         }
@@ -60,7 +60,7 @@ namespace matrixMapp {
     // Particles' pointers are eliminated from the matrix mesh
     void matrixCells::clear() {
          // Iterates over all the current pointers and delete them
-        std::vector<std::deque<particle_t *>*>::iterator it;
+        std::vector<std::vector<particle_t *>*>::iterator it;
         for (it = cells->begin(); it != cells->end(); ++it) {
             (*it)->clear();
         }
@@ -73,19 +73,29 @@ namespace matrixMapp {
     }
 
 
+    // Remove particle from old index bin
+    void matrixCells::remove(particle_t & p, int index) {
+        std::vector<particle_t *>* old_bin = (*cells)[index];
+        particle_t * addr = &p;
+
+        // maybe try swap too
+        // https://stackoverflow.com/a/3385251
+        old_bin->erase(std::remove(old_bin->begin(), old_bin->end(), addr), old_bin->end());
+    }
+
     // Adjacent indexes for specific sequence containing the relevant particle
     // Particle
-    std::deque<particle_t *>::iterator matrixCells::InitAdjPart(particle_t & p) {
+    std::vector<particle_t *>::iterator matrixCells::InitAdjPart(particle_t & p) {
         return (*cells)[get_index(p)]->begin();
     }
 
     // Initial index
-    std::vector<std::deque<particle_t *>*>::iterator matrixCells::InitAdj() {
+    std::vector<std::vector<particle_t *>*>::iterator matrixCells::InitAdj() {
         return cells->begin();
     }
 
     // Final index
-    std::vector<std::deque<particle_t *>*>::iterator matrixCells::EndAdj() {
+    std::vector<std::vector<particle_t *>*>::iterator matrixCells::EndAdj() {
         return cells->end();
     }
 
@@ -131,6 +141,14 @@ namespace matrixMapp {
         return row;
     }
 
+    int matrixCells::get_rows() {
+        return nrows;
+    }
+
+    int matrixCells::get_cols() {
+        return ncols;
+    }
+
 
     // Get the column value of particle p inside the mesh
     int matrixCells::getCol(particle_t & p) {
@@ -161,7 +179,7 @@ namespace matrixMapp {
         r = ulr;
         c = ulc;
 
-        // Deque vector is initialized
+        // vector vector is initialized
         pit = mmesh->cells->at(mmesh->get_index(r, c))->begin();
         pit_last = mmesh->cells->at(mmesh->get_index(r, c))->end();
 
@@ -173,16 +191,16 @@ namespace matrixMapp {
     // Destructor
     matrixCells::matrixIter::~matrixIter() {}
 
-    // References to deque: point to valid references
+    // References to vector: point to valid references
     matrixCells::matrixIter & matrixCells::matrixIter::operator++() {
-        // Deque reference is increased. Next iteration.
+        // vector reference is increased. Next iteration.
         ++pit;
         updateIter();
         return *this;
     }
 
     matrixCells::matrixIter::pointer matrixCells::matrixIter::operator*() const {
-        // Deque reference is dereferenced
+        // vector reference is dereferenced
         return *pit;
     }
 
@@ -214,7 +232,7 @@ namespace matrixMapp {
                 return;
             }
 
-            // Otherwise, indexes are updated for the deque
+            // Otherwise, indexes are updated for the vector
             else {
                 pit = mmesh->cells->at(mmesh->get_index(r, c))->begin();
                 pit_last = mmesh->cells->at(mmesh->get_index(r, c))->end();

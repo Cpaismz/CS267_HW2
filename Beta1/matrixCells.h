@@ -2,8 +2,7 @@
 #ifndef MATRIXCELLS
 #define MATRIXCELLS
 
-// Deque and vector for pointer vectors
-#include <deque>
+// vector and vector for pointer vectors
 #include <vector>
 
 // Common header
@@ -57,11 +56,11 @@ namespace matrixMapp {
                 // Coordinates: upper left, bottom right
                 int ulr, ulc, brr, brc;
 
-                // Particle iterator (from deque)
-                std::deque<particle_t *>::iterator pit;
+                // Particle iterator (from vector)
+                std::vector<particle_t *>::iterator pit;
 
-                // Particle iterator: last element (from deque)
-                std::deque<particle_t *>::iterator pit_last;
+                // Particle iterator: last element (from vector)
+                std::vector<particle_t *>::iterator pit_last;
 
                 // Next iterator function: updates the outer iteration
                 void updateIter();
@@ -83,10 +82,13 @@ namespace matrixMapp {
     // Insert particles
     void insert(particle_t &);
 
+    // Delete particles
+    void remove(particle_t &, int);
+
     // Adjacent indexes for specific sequence containing the relevant particle
-    std::deque<particle_t *>::iterator InitAdjPart(particle_t &);
-    std::vector<std::deque<particle_t *>*>::iterator InitAdj();
-    std::vector<std::deque<particle_t *>*>::iterator EndAdj();
+    std::vector<particle_t *>::iterator InitAdjPart(particle_t &);
+    std::vector<std::vector<particle_t *>*>::iterator InitAdj();
+    std::vector<std::vector<particle_t *>*>::iterator EndAdj();
 
     // Objects: initial and endint
     matrixIter AdjInitial(particle_t &);
@@ -95,6 +97,10 @@ namespace matrixMapp {
     // Get methods: coordinates of a particle in rows and colums
     int getRow(particle_t &);
     int getCol(particle_t &);
+
+    int get_index(particle_t &);
+    int get_rows();
+    int get_cols();  
 
     // Private elements
     private:
@@ -107,17 +113,16 @@ namespace matrixMapp {
 
         // Adjacent cells
         int Nadjacents;
-        std::vector<std::deque<particle_t *>*>* cells;
+        std::vector<std::vector<particle_t *>*>* cells;
 
         // Methods
         //
         void ULadj(int&, int&, particle_t&);
         void BRadj(int&, int&, particle_t&);
 
+
         // Get the index of a certain particle based on row/col or pointer
         int get_index(int row, int col);
-        int get_index(particle_t &);
-
     };
 }
 

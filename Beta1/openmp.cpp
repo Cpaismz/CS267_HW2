@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <assert.h>
 #include <math.h>
+#include <iostream>
 #include "common.h"
 #include "matrixCells.h"
 #include "omp.h"
@@ -12,6 +13,10 @@
 //
 int main( int argc, char **argv )
 {
+    /*
+    omp_lock_t write_lock;
+    omp_init_lock(&write_lock);*/
+
     int navg,nabsavg=0,numthreads;
     double dmin, absmin=1.0,davg,absavg=0.0;
 
@@ -44,10 +49,15 @@ int main( int argc, char **argv )
     //
     //  simulate a number of time steps
     //
-    double simulation_time = read_timer( );
-
+    double simulation_time = read_timer();
+    int num_entries = mesh->get_cols() * mesh->get_rows();
+    omp_lock_t* locks = (omp_lock_t*)malloc(sizeof(omp_lock_t) *  num_entries);
     #pragma omp parallel private(dmin)
     {
+        #pragma omp for
+        for (int i = 0; i < num_entries; i++) {
+            omp_init_lock(&locks[i]);
+        }
         numthreads = omp_get_num_threads();
     for( int step = 0; step < NSTEPS ; step++ )
     {
@@ -71,19 +81,45 @@ int main( int argc, char **argv )
             }
         }
 
+
         //
         //  move particles
         //
         #pragma omp for
-        for( int i = 0; i < n; i++ )
+        for( int i = 0; i < n; i++ ){
+            int old_index = mesh->get_index(particles[i]);
             move( particles[i] );
+            int new_index = mesh->get_index(particles[i]);
+            if (old_index != new_index) {
+                omp_set_lock(&locks[old_index]);
+                mesh->remove(particles[i], old_index);
+                omp_unset_lock(&locks[old_index]);
+
+                omp_set_lock(&locks[new_index]);
+                mesh->insert(particles[i]);
+                omp_unset_lock(&locks[new_index]);
+            }
+
+            /* 
+            fine grained locking?
+            1) cache location of old particle
+            2) move particle
+            3) get new location
+            4) if bucket_changed:
+                // we can either used fine grained locking or overall locking
+                5) lock old bucket, remove particle, unlock
+                6) lock new bucket, add particle, unlock
+            */
+        }
+
 
         // Update grid hash set.
+       /* 
         #pragma omp single
         {
             mesh->clear();
             push2Mesh(n, particles, mesh);
-        }
+        }*/
 
         if( find_option( argc, argv, "-no" ) == -1 )
         {
@@ -108,7 +144,14 @@ int main( int argc, char **argv )
         }
 
     }
+        #pragma omp for
+        for (int i = 0; i < num_entries; i++) {
+            omp_destroy_lock(&locks[i]);
+        }
+
 }
+
+        free(locks);
     simulation_time = read_timer( ) - simulation_time;
 
     printf( "n = %d,threads = %d, simulation time = %g seconds", n,numthreads, simulation_time);
