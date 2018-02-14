@@ -8,6 +8,8 @@
 #include "omp.h"
 
 
+#define min( i, j ) ( (i)<(j) ? (i): (j) )
+#define max( i, j ) ( (i)>(j) ? (i): (j) )
 //
 //  benchmarking program
 //
@@ -50,7 +52,8 @@ int main( int argc, char **argv )
     //  simulate a number of time steps
     //
     double simulation_time = read_timer();
-    int num_entries = mesh->get_cols() * mesh->get_rows();
+    int max_locks = 320;
+    int num_entries = min(mesh->get_cols() * mesh->get_rows(), max_locks);
     omp_lock_t* locks = (omp_lock_t*)malloc(sizeof(omp_lock_t) *  num_entries);
     #pragma omp parallel private(dmin)
     {
@@ -91,13 +94,15 @@ int main( int argc, char **argv )
             move( particles[i] );
             int new_index = mesh->get_index(particles[i]);
             if (old_index != new_index) {
-                omp_set_lock(&locks[old_index]);
+                int lock_old_index = old_index * num_entries / (mesh->get_rows() * mesh->get_cols());
+                omp_set_lock(&locks[lock_old_index]);
                 mesh->remove(particles[i], old_index);
-                omp_unset_lock(&locks[old_index]);
+                omp_unset_lock(&locks[lock_old_index]);
 
-                omp_set_lock(&locks[new_index]);
+                int lock_new_index = new_index * num_entries / (mesh->get_rows() * mesh->get_cols());
+                omp_set_lock(&locks[lock_new_index]);
                 mesh->insert(particles[i]);
-                omp_unset_lock(&locks[new_index]);
+                omp_unset_lock(&locks[lock_new_index]);
             }
 
             /* 
