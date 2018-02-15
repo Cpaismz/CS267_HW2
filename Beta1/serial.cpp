@@ -77,12 +77,14 @@ int main( int argc, char **argv )
         //  move particles
         //
         for( int i = 0; i < n; i++ ) {
+            int old_index = mesh->get_index(particles[i]);
             move( particles[i] );
+            int new_index = mesh->get_index(particles[i]);
+            if (old_index != new_index) {
+                mesh->remove(particles[i], old_index);
+                mesh->insert(particles[i]);
+            }
         }
-
-        // Update mesh hash set.
-        mesh->clear();
-        push2Mesh(n, particles, mesh);
 
 
 
