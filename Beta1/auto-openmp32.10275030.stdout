@@ -1,0 +1,60 @@
+n = 4000,threads = 2, simulation time = 0.698645 seconds
+total clear wait time: 0.085811
+total lock_init wait time: 0.001661
+
+n = 4000,threads = 2, simulation time = 0.704404 seconds
+total clear wait time: 0.085126
+total lock_init wait time: 0.003287
+
+n = 4000,threads = 2, simulation time = 0.678026 seconds
+total clear wait time: 0.084918
+total lock_init wait time: 0.001865
+
+n = 8000,threads = 4, simulation time = 1.10337 seconds
+total clear wait time: 0.302822
+total lock_init wait time: 0.002023
+
+n = 8000,threads = 4, simulation time = 1.10828 seconds
+total clear wait time: 0.296091
+total lock_init wait time: 0.001809
+
+n = 8000,threads = 4, simulation time = 1.08011 seconds
+total clear wait time: 0.296062
+total lock_init wait time: 0.001640
+
+n = 12000,threads = 6, simulation time = 1.16509 seconds
+total clear wait time: 0.481111
+total lock_init wait time: 0.002933
+
+n = 12000,threads = 6, simulation time = 1.12824 seconds
+total clear wait time: 0.415201
+total lock_init wait time: 0.001741
+
+n = 12000,threads = 6, simulation time = 1.154 seconds
+total clear wait time: 0.480325
+total lock_init wait time: 0.001401
+
+n = 24000,threads = 12, simulation time = 1.29278 seconds
+total clear wait time: 1.076821
+total lock_init wait time: 0.002037
+
+n = 24000,threads = 12, simulation time = 1.30599 seconds
+total clear wait time: 1.056710
+total lock_init wait time: 0.001678
+
+n = 24000,threads = 12, simulation time = 1.37177 seconds
+total clear wait time: 1.095764
+total lock_init wait time: 0.001655
+
+n = 36000,threads = 18, simulation time = 1.45248 seconds
+total clear wait time: 1.782958
+total lock_init wait time: 0.004223
+
+n = 36000,threads = 18, simulation time = 1.35113 seconds
+total clear wait time: 1.729276
+total lock_init wait time: 0.001979
+
+n = 36000,threads = 18, simulation time = 1.36069 seconds
+total clear wait time: 1.756441
+total lock_init wait time: 0.004358
+

@@ -3,6 +3,7 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <omp.h>
 #include "common.h"
 #include "matrixCells.h"
 
@@ -11,6 +12,8 @@
 //
 int main( int argc, char **argv )
 {
+    int num_adds = 0;
+    double wait_time = 0.0;
     // Correctness variables
     int navg,nabsavg=0;
     double davg,dmin, absmin=1.0, absavg=0.0;
@@ -76,15 +79,14 @@ int main( int argc, char **argv )
         //
         //  move particles
         //
+        double start_time = omp_get_wtime();
         for( int i = 0; i < n; i++ ) {
             move( particles[i] );
         }
 
-        // Update mesh hash set.
-        mesh->clear();
-        push2Mesh(n, particles, mesh);
-
-
+        double finish_time = omp_get_wtime();
+        num_adds++;
+        wait_time += finish_time - start_time;
 
         // CHECK IF WE WANT TO TEST CORRECTNESS
         if( find_option( argc, argv, "-no" ) == -1 )
@@ -106,9 +108,9 @@ int main( int argc, char **argv )
         }
     }
     simulation_time = read_timer( ) - simulation_time;
-
     printf( "n = %d, simulation time = %g seconds", n, simulation_time);
 
+    printf("\naverage clear wait time: %f\n", wait_time);
     if( find_option( argc, argv, "-no" ) == -1 )
     {
       if (nabsavg) absavg /= nabsavg;

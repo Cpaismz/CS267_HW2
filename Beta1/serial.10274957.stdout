@@ -1,0 +1,39 @@
+n = 4000, simulation time = 1.14317 seconds
+average clear wait time: 0.068049
+
+n = 4000, simulation time = 1.14314 seconds
+average clear wait time: 0.068020
+
+n = 4000, simulation time = 1.14371 seconds
+average clear wait time: 0.067984
+
+n = 8000, simulation time = 2.58086 seconds
+average clear wait time: 0.137430
+
+n = 8000, simulation time = 2.67067 seconds
+average clear wait time: 0.137880
+
+n = 8000, simulation time = 2.67046 seconds
+average clear wait time: 0.138103
+
+n = 12000, simulation time = 4.14911 seconds
+average clear wait time: 0.207224
+
+n = 12000, simulation time = 4.02558 seconds
+average clear wait time: 0.206548
+
+n = 12000, simulation time = 4.044 seconds
+average clear wait time: 0.206691
+
+n = 24000, simulation time = 8.44949 seconds
+average clear wait time: 0.414094
+
+n = 24000, simulation time = 8.47757 seconds
+average clear wait time: 0.414593
+
+n = 36000, simulation time = 13.2164 seconds
+average clear wait time: 0.624102
+
+n = 36000, simulation time = 13.2929 seconds
+average clear wait time: 0.625048
+

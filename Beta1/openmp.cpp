@@ -3,9 +3,9 @@
 #include <assert.h>
 #include <math.h>
 #include <iostream>
+#include <omp.h>
 #include "common.h"
 #include "matrixCells.h"
-#include "omp.h"
 
 
 #define min( i, j ) ( (i)<(j) ? (i): (j) )
@@ -15,9 +15,8 @@
 //
 int main( int argc, char **argv )
 {
-    /*
-    omp_lock_t write_lock;
-    omp_init_lock(&write_lock);*/
+    int num_adds = 0;
+    double wait_time = 0.0;
 
     int navg,nabsavg=0,numthreads;
     double dmin, absmin=1.0,davg,absavg=0.0;
@@ -34,7 +33,6 @@ int main( int argc, char **argv )
     }
 
     int n = read_int( argc, argv, "-n", 1000 );
-
     char *savename = read_string( argc, argv, "-o", NULL );
     char *sumname = read_string( argc, argv, "-s", NULL );
 
@@ -54,10 +52,12 @@ int main( int argc, char **argv )
     double simulation_time = read_timer();
     omp_lock_t* locks;
     int num_entries;
+    double lock_init_time = 0.0;
     #pragma omp parallel private(dmin)
     {
         numthreads = omp_get_num_threads();
         int max_locks = 20 * numthreads;
+        double temp = omp_get_wtime();
         #pragma omp single
         {
             num_entries = min(mesh->get_cols() * mesh->get_rows(), max_locks);
@@ -67,6 +67,11 @@ int main( int argc, char **argv )
         #pragma omp for
         for (int i = 0; i < num_entries; i++) {
             omp_init_lock(&locks[i]);
+        }
+        temp = omp_get_wtime() - temp;
+        #pragma omp critical
+        {
+            lock_init_time += temp;
         }
     for( int step = 0; step < NSTEPS ; step++ )
     {
@@ -90,7 +95,7 @@ int main( int argc, char **argv )
             }
         }
 
-
+        double start_time = omp_get_wtime();
         //
         //  move particles
         //
@@ -111,6 +116,12 @@ int main( int argc, char **argv )
                 mesh->insert(particles[i]);
                 omp_unset_lock(&locks[lock_new_index]);
             }
+        }
+        double finish_time = omp_get_wtime();
+        #pragma omp critical
+        {
+            num_adds++;
+            wait_time += finish_time - start_time;
         }
 
         if( find_option( argc, argv, "-no" ) == -1 )
@@ -148,6 +159,8 @@ int main( int argc, char **argv )
 
     printf( "n = %d,threads = %d, simulation time = %g seconds", n,numthreads, simulation_time);
 
+    printf("\ntotal clear wait time: %f\n", wait_time);
+    printf("total lock_init wait time: %f\n", lock_init_time/numthreads);
     if( find_option( argc, argv, "-no" ) == -1 )
     {
       if (nabsavg) absavg /= nabsavg;
