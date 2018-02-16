@@ -38,5 +38,5 @@ srun -n 1 -c 18 ./openmp -p 18 -n 36000 -no -s openmp.txt
 export OMP_NUM_THREADS=24
 srun -n 1 -c 24 ./openmp -p 24 -n 48000 -no -s openmp.txt
 export OMP_NUM_THREADS=32
-srun -n 1 -c 32 ./openmp -p 32 -n 72000 -no -s openmp.txt
+srun -n 1 -c 32 ./openmp -p 32 -n 64000 -no -s openmp.txt
 ./autograder -v openmp -s openmp.txt
