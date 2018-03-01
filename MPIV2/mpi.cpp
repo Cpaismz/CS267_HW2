@@ -91,15 +91,16 @@ int main( int argc, char **argv )
     {
 
         MPI_Barrier(MPI_COMM_WORLD);
-
-        size = owned.size();
-        MPI_Allgather(&size, 1, MPI::INT, migrated_sizes, 1, MPI::INT, MPI_COMM_WORLD);
-        int sum = 0;
-        for (int i = 0; i < n_proc; i++) {
-            sum += migrated_sizes[i];
-        }
-        if (sum != n) {
-            std::cerr << "wrong size" << std::endl;
+        if( find_option( argc, argv, "-no" ) == -1 ) {
+            size = owned.size();
+            MPI_Allgather(&size, 1, MPI::INT, migrated_sizes, 1, MPI::INT, MPI_COMM_WORLD);
+            int sum = 0;
+            for (int i = 0; i < n_proc; i++) {
+                sum += migrated_sizes[i];
+            }
+            if (sum != n) {
+                std::cerr << "wrong size" << std::endl;
+            }
         }
 
         //Correctness
