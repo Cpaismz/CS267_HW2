@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unordered_set>
+#include <unistd.h>
 #include "common.h"
 #include "matrixCells.h"
 
@@ -87,9 +88,14 @@ int main( int argc, char **argv )
     //
     int size;
     double simulation_time = read_timer( );
+    char a[30];
+    sprintf(a, "outfiles/r%d.out", rank);
+    FILE* fptr = fopen(a, "w");
+
+    dup2(fileno(fptr), fileno(stdout));
     for( int step = 0; step < NSTEPS; step++ )
     {
-
+        printf("a"); fflush(stdout);
         MPI_Barrier(MPI_COMM_WORLD);
 
         size = owned.size();
@@ -102,6 +108,7 @@ int main( int argc, char **argv )
             std::cerr << "wrong size" << std::endl;
         }
 
+        printf("b"); fflush(stdout);
         //Correctness
         navg = 0;
         davg = 0.0;
@@ -119,22 +126,30 @@ int main( int argc, char **argv )
         int i = 0;
         for (auto & a : owned) {
             halo_buf[i] = *a;
+            if (mesh->get_owner(halo_buf[i]) != rank) {
+                
+                printf("sn: %d ", mesh->get_owner(halo_buf[i])); fflush(stdout);
+            }
             i++;
         }
+
         MPI_Request* trash = (MPI_Request*)malloc(n_proc * sizeof(MPI_Request));
         for (int i = 0; i < mesh->get_adj(); i += mesh->get_proc_rows()) {
             
             int left_addr = rank - i - 1;
             int right_addr = rank + i + 1;
             if (left_addr >= 0) {
+                printf("send %d ", (int)owned.size());
                 MPI_Isend(halo_buf, owned.size(), PARTICLE, left_addr, 0, MPI_COMM_WORLD, &(trash[left_addr]));
             }
             if (right_addr < n_proc) {
+                printf("send %d ", (int)owned.size());
                 MPI_Isend(halo_buf, owned.size(), PARTICLE, right_addr, 0, MPI_COMM_WORLD, &(trash[right_addr]));
             }
         }
         free(trash);
 
+        printf("c"); fflush(stdout);
         particle_t*  rec_buf = (particle_t*)malloc(sizeof(particle_t) * n);
         int offset = 0;
         for (int i = 0; i < mesh->get_adj(); i += mesh->get_proc_rows()) {
@@ -145,6 +160,7 @@ int main( int argc, char **argv )
                 MPI_Recv(rec_buf + offset, n, PARTICLE, left_addr, 0, MPI_COMM_WORLD, &stat);
                 int num_rec;
                 MPI_Get_count(&stat, PARTICLE, &num_rec);
+                printf("recv %d ", num_rec);
                 offset += num_rec;
             }
             if (right_addr < n_proc) {
@@ -152,14 +168,18 @@ int main( int argc, char **argv )
                 MPI_Recv(rec_buf + offset, n, PARTICLE, right_addr, 0, MPI_COMM_WORLD, &stat);
                 int num_rec;
                 MPI_Get_count(&stat, PARTICLE, &num_rec);
+                printf("recv %d ", num_rec);
                 offset += num_rec;
             }
         }
+
+        printf("%d %d", offset, n); fflush(stdout);
         push2Mesh(offset, rec_buf, mesh);
         //
         //  compute all forces
         //
 
+        printf("d"); fflush(stdout);
         for (auto & part : owned) {
             part->ax = part->ay = 0;
 
@@ -215,6 +235,8 @@ int main( int argc, char **argv )
                 }
             }
         }
+
+
         std::vector<particle_t> migrated;
         for (auto a : to_del) {
             migrated.push_back(*a);
@@ -222,11 +244,12 @@ int main( int argc, char **argv )
             free(a);
         }
         // TODO: this is still an all-to-all broadcast, but only of the particles that moved
+        printf("e"); fflush(stdout);
 
         size = migrated.size();
         MPI_Allgather(&size, 1, MPI::INT, migrated_sizes, 1, MPI::INT, MPI_COMM_WORLD);
 
-
+        printf("f"); fflush(stdout);
         disp_sizes[0] = 0;
         for (int i = 1; i < n_proc; i++) {
             disp_sizes[i] = disp_sizes[i-1] + migrated_sizes[i-1];
@@ -239,6 +262,7 @@ int main( int argc, char **argv )
 
         MPI_Allgatherv(&(migrated[0]), migrated.size(), PARTICLE, particles, migrated_sizes, disp_sizes, PARTICLE, MPI_COMM_WORLD );
 
+        printf("g"); fflush(stdout);
         push2Set(tot_migrated, particles, mesh, owned, rank);
     }
     simulation_time = read_timer( ) - simulation_time;

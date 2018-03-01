@@ -1,7 +1,7 @@
-CC = CC
+CC = mpicxx
 MPCC = CC
 OPENMP = -openmp
-CFLAGS = -O3 -std=c++11
+CFLAGS = -g -std=c++11
 LIBS =
 
 
