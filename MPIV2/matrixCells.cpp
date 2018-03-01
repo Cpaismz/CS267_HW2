@@ -4,6 +4,7 @@
 #include <iostream>
 #include <vector>
 #include <algorithm>
+#include <unordered_set>
 
 // Definition of the newspace associated with the matrix/grid
 namespace matrixMapp {
@@ -184,6 +185,26 @@ namespace matrixMapp {
         return get_index(getRow(p), getCol(p));
     }
 
+
+    int matrixCells::flattenRow(int rowNum, particle_t * buf, std::unordered_set<particle_t*> & m) {
+        int numAdded = 0;
+        /* 
+        for (auto & p : m) {
+            if (getRow(*p) == rowNum) {
+                buf[numAdded] = *p;
+                numAdded++;
+            }
+        }*/
+       
+        for (int i = rowNum * ncols; i < (rowNum + 1) * ncols; i++) {
+            auto box = (*cells)[i];
+            for (particle_t* elem : *box) {
+                buf[numAdded] = *elem;
+                numAdded++;
+            }
+        }
+        return numAdded;
+    }
 
     // Get the row value of particle p inside the mesh
     int matrixCells::getRow(particle_t & p) {

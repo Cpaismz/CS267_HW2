@@ -77,9 +77,9 @@ void init_particles(int n, particle_t p[])
 
 // Push the generated particles into a matrixCells class object
 void push2Mesh(int n, particle_t* p, matrixMapp::matrixCells* mesh) { 
-    printf("%p %p %d", p, mesh, n); fflush(stdout);
+    //printf("%p %p %d", p, mesh, n); fflush(stdout);
     for (int i = 0; i < n; ++i) {
-        printf("own: %d ", mesh->get_owner(p[i])); fflush(stdout);
+        //printf("own: %d ", mesh->get_owner(p[i])); fflush(stdout);
         mesh->insert(p[i]);
     }
 }
