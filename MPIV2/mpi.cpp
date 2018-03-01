@@ -171,6 +171,7 @@ int main( int argc, char **argv )
             }
         }
 
+        MPI_Barrier(MPI_COMM_WORLD);
         mesh->clear_fringes(rank);
         free(rec_buf);
         free(halo_buf);
@@ -241,6 +242,10 @@ int main( int argc, char **argv )
         push2Set(tot_migrated, particles, mesh, owned, rank);
     }
     simulation_time = read_timer( ) - simulation_time;
+
+    for (auto a : owned) {
+        free(a);
+    }
 
     if (rank == 0) {
       printf( "n = %d, simulation time = %g seconds", n, simulation_time);
