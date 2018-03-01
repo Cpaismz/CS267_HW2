@@ -130,11 +130,12 @@ int main( int argc, char **argv )
 
         particle_t*  halo_buf = (particle_t*)malloc(sizeof(particle_t) * n);
         // only send the number of necessary rows, as opposed to all
+        /*
          int i = 0;
          for (auto & a : owned) {
              halo_buf[i] = *a;
              i++;
-         }
+         }*/
  
 
         MPI_Request trash;
@@ -144,29 +145,30 @@ int main( int argc, char **argv )
             //printf("rts:%d ", rows_to_send); fflush(stdout);
             int left_addr = rank - i - 1;
             if (left_addr >= 0) {
-                /*
+                
                 int prev = 0;
                 for (int i = 0; i < rows_to_send; i++) {
                     int row_offset = mesh->get_row_offset(rank);
                     prev += mesh->flattenRow(row_offset + i, halo_buf + prev, owned);
                 }
-                printf("p: %d a: %d ", prev, owned.size());
-                MPI_Isend(halo_buf, prev, PARTICLE, left_addr, 0, MPI_COMM_WORLD, &trash);*/
-                MPI_Isend(halo_buf, owned.size(), PARTICLE, left_addr, 0, MPI_COMM_WORLD, &trash);
+                //printf("p: %d a: %d ", prev, owned.size());
+                MPI_Isend(halo_buf, prev, PARTICLE, left_addr, 0, MPI_COMM_WORLD, &trash);
+                
+                //MPI_Isend(halo_buf, owned.size(), PARTICLE, left_addr, 0, MPI_COMM_WORLD, &trash);
             }
             
             int right_addr = rank + i + 1;
             if (right_addr < n_proc) {
-            /*
+            
                 int prev = 0;
                 for (int i = 0; i < rows_to_send; i++) {
                     int row_offset = mesh->get_row_offset(rank);
                     prev += mesh->flattenRow(row_offset + mesh->get_proc_rows() - i - 1, halo_buf + prev, owned);
                 }
 
-                printf("p: %d a: %d ", prev, owned.size());
-                MPI_Isend(halo_buf, prev, PARTICLE, right_addr, 0, MPI_COMM_WORLD, &trash);*/
-                MPI_Isend(halo_buf, owned.size(), PARTICLE, right_addr, 0, MPI_COMM_WORLD, &trash);
+                //printf("p: %d a: %d ", prev, owned.size());
+                MPI_Isend(halo_buf, prev, PARTICLE, right_addr, 0, MPI_COMM_WORLD, &trash);
+                //MPI_Isend(halo_buf, owned.size(), PARTICLE, right_addr, 0, MPI_COMM_WORLD, &trash);
             }
 
 
