@@ -71,6 +71,7 @@ namespace matrixMapp {
 
     // Matrix cells class constructor
     matrixCells(int n, double size, double cutoff_radius);
+    matrixCells(int n, double size, double cutoff_radius, int grid_len_fac);
 
     // Destructor
     ~matrixCells();
@@ -100,13 +101,20 @@ namespace matrixMapp {
 
     int get_index(particle_t &);
     int get_rows();
-    int get_cols();  
+    int get_cols();
+    int get_adj();
+    
+    void clear_fringes(int proc_n);
+    int get_row_offset(int proc_n);
+    int get_proc_rows();
+    bool owns_particle(particle_t& p, int proc_n);
 
     // Private elements
     private:
         // Rows and columns
         int nrows;
         int ncols;
+        int rows_per_proc;
 
         // Size of the matrix
         double msize;
@@ -119,7 +127,6 @@ namespace matrixMapp {
         //
         void ULadj(int&, int&, particle_t&);
         void BRadj(int&, int&, particle_t&);
-
 
         // Get the index of a certain particle based on row/col or pointer
         int get_index(int row, int col);

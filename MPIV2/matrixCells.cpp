@@ -28,6 +28,8 @@ namespace matrixMapp {
             // Total size of the matrix
             msize(size / nrows),
 
+            rows_per_proc(-1),
+
             // Number of adjacent/neighbor cells
             Nadjacents(ceil(cutoff_radius / msize)) {
 
@@ -43,6 +45,40 @@ namespace matrixMapp {
                 }
             }
 
+
+    matrixCells::matrixCells(int n, double size, double cutoff_radius, int grid_len_fac) {
+        // for simplicity, we want the side of a grid to be a multiple of grid_len_fac (MPI)
+        int grid_len = grid_len_fac;
+        while (grid_len * grid_len < n) {
+            grid_len += grid_len_fac;
+        }
+
+        // Number of rows of the matrix
+        nrows = grid_len;
+
+        // Number of columns
+        ncols = grid_len;
+
+        // Number of rows per processor
+        rows_per_proc = nrows / grid_len_fac;
+
+        // Total size of the matrix
+        msize = size / nrows;
+
+        // Number of adjacent/neighbor cells
+        Nadjacents = ceil(cutoff_radius / msize);
+
+        // New vector vector with references
+        cells = new std::vector<std::vector<particle_t *>*>(nrows * ncols);
+
+        // Iterator is initialized
+        std::vector<std::vector<particle_t *>*>::iterator it;
+
+        // Add references
+        for (it = cells->begin(); it != cells->end(); ++it) {
+            *it = new std::vector<particle_t *>();
+        }
+    }
 
     // Destructor method: delete the matrix's cells
     matrixCells::~matrixCells() {
@@ -81,6 +117,21 @@ namespace matrixMapp {
         // maybe try swap too
         // https://stackoverflow.com/a/3385251
         old_bin->erase(std::remove(old_bin->begin(), old_bin->end(), addr), old_bin->end());
+    }
+
+    void matrixCells::clear_fringes(int proc_n) {
+        for (int i = 0; i < Nadjacents; i++) {
+            int left_row_index = proc_n * rows_per_proc - i - 1;
+            int right_row_index = (proc_n + 1) * rows_per_proc + i;
+            for (int j = 0; j < ncols; j++) {
+                if (left_row_index >= 0) {
+                    (*cells)[ncols * left_row_index + j]->clear();
+                }
+                if (right_row_index < nrows) {
+                    (*cells)[ncols * right_row_index + j]->clear();
+                }
+            }
+        }
     }
 
     // Adjacent indexes for specific sequence containing the relevant particle
@@ -141,6 +192,10 @@ namespace matrixMapp {
         return row;
     }
 
+    int matrixCells::get_adj() {
+        return Nadjacents;
+    }
+
     int matrixCells::get_rows() {
         return nrows;
     }
@@ -149,6 +204,18 @@ namespace matrixMapp {
         return ncols;
     }
 
+    int matrixCells::get_row_offset(int proc_n) {
+        return proc_n * rows_per_proc;
+    }
+
+    int matrixCells::get_proc_rows() {
+        return rows_per_proc;
+    }
+
+    bool matrixCells::owns_particle(particle_t& p, int proc_n) {
+        int p_row = getRow(p);
+        return p_row >= get_row_offset(proc_n) && p_row < get_row_offset(proc_n) + rows_per_proc;
+    }
 
     // Get the column value of particle p inside the mesh
     int matrixCells::getCol(particle_t & p) {

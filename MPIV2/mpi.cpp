@@ -4,6 +4,8 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <unordered_set>
 #include "common.h"
 #include "matrixCells.h"
 
@@ -33,7 +35,6 @@ int main( int argc, char **argv )
     char *savename = read_string( argc, argv, "-o", NULL );
     char *sumname = read_string( argc, argv, "-s", NULL );
 
-
     //
     //  set up MPI
     //
@@ -52,40 +53,39 @@ int main( int argc, char **argv )
     // A MPI Datatype PARTICLE is defined containing the six values particle_t.
     MPI_Datatype PARTICLE;
     MPI_Type_contiguous( 6, MPI_DOUBLE, &PARTICLE );
+
     MPI_Type_commit( &PARTICLE );
-
-    //
-    //  set up the data partitioning across processors
-    //
-    int particle_per_proc = (n + n_proc - 1) / n_proc;
-    int *partition_offsets = (int*) malloc( (n_proc+1) * sizeof(int) );
-    for( int i = 0; i < n_proc+1; i++ )
-        partition_offsets[i] = min( i * particle_per_proc, n );
-
-    int *partition_sizes = (int*) malloc( n_proc * sizeof(int) );
-    for( int i = 0; i < n_proc; i++ )
-        partition_sizes[i] = partition_offsets[i+1] - partition_offsets[i];
-
-    //
-    //  allocate storage for local partition
-    //
-    int nlocal = partition_sizes[rank];
 
     //
     //  initialize and distribute the particles (that's fine to leave it unoptimized)
     //
     set_size( n );
     particle_t *particles = (particle_t*) malloc( n * sizeof(particle_t) );
+
+
+    // invariant: at any given time, only the values within one mesh are valid
+
+    // we have to broadcast particles because we want a consistent initial state
     if( rank == 0 ) {
         init_particles( n, particles );
     }
     MPI_Bcast(particles, n, PARTICLE, 0, MPI_COMM_WORLD);
+    matrixMapp::matrixCells* mesh = new matrixMapp::matrixCells(n, size, cutoff, n_proc);
+    // a set of pointers... each to be individually malloced
+    // my code is disgusting
+    std::unordered_set<particle_t*> owned;
 
-    matrixMapp::matrixCells* mesh = new matrixMapp::matrixCells(n, size, cutoff);
+    // filters a list of particles into a set to back the memory and adds that list to the grid
+    push2Set(n, particles, mesh, owned, rank);
 
+
+    int gridLen = mesh->get_cols();
+    int* migrated_sizes = (int*)malloc(n_proc * sizeof(int));
+    int* disp_sizes = (int*)malloc(n_proc * sizeof(int));
     //
     //  simulate a number of time steps
     //
+
     double simulation_time = read_timer( );
     for( int step = 0; step < NSTEPS; step++ )
     {
@@ -93,11 +93,6 @@ int main( int argc, char **argv )
         navg = 0;
         davg = 0.0;
         dmin = 1.0;
-        //
-
-        // Insert the particles into the matrix
-        mesh->clear();
-        push2Mesh(n, particles, mesh);
 
         //
         //  save current step if necessary (slightly different semantics than in other codes)
@@ -106,19 +101,63 @@ int main( int argc, char **argv )
             if( rank == 0 && fsave && (step % SAVEFREQ) == 0 )
                 save( fsave, n, particles );
 
+        particle_t*  halo_buf = (particle_t*)malloc(sizeof(particle_t) * owned.size());
+        // only send the number of necessary rows, as opposed to all
+        int i = 0;
+        for (auto & a : owned) {
+            halo_buf[i] = *a;
+            i++;
+        }
+        for (int i = 0; i < mesh->get_adj(); i += mesh->get_proc_rows()) {
+            int left_addr = rank - i - 1;
+            int right_addr = rank + i + 1;
+            if (left_addr >= 0) {
+                MPI_Send(halo_buf, owned.size(), PARTICLE, left_addr, 0, MPI_COMM_WORLD);
+            }
+            if (right_addr < n_proc) {
+                MPI_Send(halo_buf, owned.size(), PARTICLE, right_addr, 0, MPI_COMM_WORLD);
+            }
+        }
+
+        particle_t*  rec_buf = (particle_t*)malloc(sizeof(particle_t) * n);
+        int offset = 0;
+        for (int i = 0; i < mesh->get_adj(); i += mesh->get_proc_rows()) {
+            int left_addr = rank - i - 1;
+            int right_addr = rank + i + 1;
+            if (left_addr >= 0) {
+                MPI_Status stat;
+                MPI_Recv(rec_buf + offset, n, PARTICLE, left_addr, 0, MPI_COMM_WORLD, &stat);
+                int num_rec;
+                MPI_Get_count(&stat, PARTICLE, &num_rec);
+                offset += num_rec;
+            }
+            if (right_addr < n_proc) {
+                MPI_Status stat;
+                MPI_Recv(rec_buf + offset, n, PARTICLE, right_addr, 0, MPI_COMM_WORLD, &stat);
+                int num_rec;
+                MPI_Get_count(&stat, PARTICLE, &num_rec);
+                offset += num_rec;
+            }
+        }
+        push2Mesh(offset, rec_buf, mesh);
         //
         //  compute all forces
         //
-        for (int i = partition_offsets[rank]; i < partition_offsets[rank + 1]; i++)
-        {
-            particles[i].ax = particles[i].ay = 0;
+
+        for (auto & part : owned) {
+            part->ax = part->ay = 0;
 
             // Only check the neighbors of the current particle: at most 8 cells
             matrixMapp::matrixCells::matrixIter adjIter;
-            for (adjIter = mesh->AdjInitial(particles[i]); adjIter != mesh->AdjEnding(particles[i]); ++adjIter) {
-                apply_force(particles[i], **adjIter, &dmin, &davg, &navg);
+            for (adjIter = mesh->AdjInitial(*part); adjIter != mesh->AdjEnding(*part); ++adjIter) {
+                // calling function by modifying non-const ref to part :(
+                apply_force(*part, **adjIter, &dmin, &davg, &navg);
             }
         }
+
+        mesh->clear_fringes(rank);
+        free(rec_buf);
+        free(halo_buf);
 
         if( find_option( argc, argv, "-no" ) == -1 )
         {
@@ -144,22 +183,45 @@ int main( int argc, char **argv )
         //
         //  move particles
         //
-        for (int i = partition_offsets[rank]; i < partition_offsets[rank + 1]; i++){
-            int old_index = mesh->get_index(particles[i]);
-            move( particles[i] );
-            int new_index = mesh->get_index(particles[i]);
+        std::vector<particle_t *> migrated;
+
+        for (auto & part : owned) {
+            int old_index = mesh->get_index(*part);
+            move( *part );
+            int new_index = mesh->get_index(*part);
             if (old_index != new_index) {
-                mesh->remove(particles[i], old_index);
-                mesh->insert(particles[i]);
+                mesh->remove(*part, old_index);
+                if (mesh->owns_particle(*part, rank)) {
+                    mesh->insert(*part);
+                } else {
+                    migrated.push_back(part);
+                }
             }
         }
 
-        // A distribution of the current work is performed.
-        particle_t* local = &particles[partition_offsets[rank]];
-        MPI_Allgatherv(local, nlocal, PARTICLE, particles, partition_sizes, partition_offsets, PARTICLE, MPI_COMM_WORLD );
+        // TODO: this is still an all-to-all broadcast, but only of the particles that moved
+        int size = migrated.size();
+        MPI_Allgather(&size, 1, MPI::INT, migrated_sizes, 1, MPI::INT, MPI_COMM_WORLD);
+        disp_sizes[0] = 0;
+        for (int i = 1; i < n_proc; i++) {
+            disp_sizes[i] = disp_sizes[i-1] + migrated_sizes[i-1];
+        }
+
+        int tot_migrated = 0;
+        for (int i = 0; i < n_proc; i++) {
+            tot_migrated += migrated_sizes[i];
+        }
+
+        MPI_Allgatherv(&(migrated[0]), migrated.size(), PARTICLE, particles, migrated_sizes, disp_sizes, PARTICLE, MPI_COMM_WORLD );
+
+        push2Set(tot_migrated, particles, mesh, owned, rank);
+        for (auto a : migrated) {
+            free(a);
+        }
 
     }
     simulation_time = read_timer( ) - simulation_time;
+    std::cerr<< "finished sim" << std::endl;
 
     if (rank == 0) {
       printf( "n = %d, simulation time = %g seconds", n, simulation_time);
@@ -192,9 +254,9 @@ int main( int argc, char **argv )
     delete mesh;
     if ( fsum )
         fclose( fsum );
-    free( partition_offsets );
-    free( partition_sizes );
     free( particles );
+    free(migrated_sizes);
+    free(disp_sizes);
 
     if( fsave )
         fclose( fsave );

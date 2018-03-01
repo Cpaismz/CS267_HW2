@@ -77,8 +77,28 @@ void init_particles(int n, particle_t p[])
 
 // Push the generated particles into a matrixCells class object
 void push2Mesh(int n, particle_t p[], matrixMapp::matrixCells* mesh) {
+
     for (int i = 0; i < n; ++i) {
         mesh->insert(p[i]);
+    }
+}
+
+void push2Mesh(int n, particle_t p[], matrixMapp::matrixCells* mesh, int rank) {
+    for (int i = 0; i < n; ++i) {
+        if (mesh->owns_particle(p[i], rank)) {
+            mesh->insert(p[i]);
+        }
+    }
+}
+
+void push2Set(int n, particle_t p[], matrixMapp::matrixCells* mesh, std::unordered_set<particle_t *> & s, int rank) {
+    for (int i = 0; i < n; ++i) {
+        if (mesh->owns_particle(p[i], rank)) {
+            particle_t * part = (particle_t *)malloc(sizeof(particle_t));
+            *part = p[i];
+            s.insert(part);
+            mesh->insert(*part);
+        }
     }
 }
 

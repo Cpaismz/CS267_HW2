@@ -1,7 +1,7 @@
 CC = CC
 MPCC = CC
 OPENMP = -openmp
-CFLAGS = -O3
+CFLAGS = -O3 -std=c++11
 LIBS =
 
 
@@ -17,12 +17,14 @@ mpi: mpi.o common.o matrixCells.o
 	$(CC) -o $@ $(LIBS) mpi.o common.o matrixCells.o
 
 
-autograder.o: autograder.cpp common.h matrixCells.cpp
-	$(CC) -c $(CFLAGS) autograder.cpp matrixCells.cpp 
-serial.o: serial.cpp common.h matrixCells.cpp 
+autograder.o: autograder.cpp common.h matrixCells.h
+	$(CC) -c $(CFLAGS) autograder.cpp
+serial.o: serial.cpp common.h
 	$(CC) -c $(CFLAGS) serial.cpp
-mpi.o: mpi.cpp common.h matrixCells.cpp 
+mpi.o: mpi.cpp common.h
 	$(CC) -c $(CFLAGS) mpi.cpp
+matrixCells.o: common.h matrixCells.h matrixCells.cpp
+	$(CC) -c $(CFLAGS) matrixCells.cpp
 common.o: common.cpp common.h
 	$(CC) -c $(CFLAGS) common.cpp
 

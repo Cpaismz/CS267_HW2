@@ -2,6 +2,7 @@
 #define __CS267_COMMON_H__
 
 #include <stdio.h>
+#include <unordered_set>
 
 namespace matrixMapp {
     class matrixCells;
@@ -54,7 +55,9 @@ double read_timer( );
 //
 void set_size( int n );
 void init_particles( int n, particle_t p[] );
+void push2Set(int n, particle_t p[], matrixMapp::matrixCells* mesh, std::unordered_set<particle_t*> & s, int rank);
 void push2Mesh(int n, particle_t p[], matrixMapp::matrixCells*);
+void push2Mesh(int n, particle_t p[], matrixMapp::matrixCells*, int rank);
 void apply_force( particle_t &particle, particle_t &neighbor , double *dmin, double *davg, int *navg);
 void move( particle_t &p );
 
