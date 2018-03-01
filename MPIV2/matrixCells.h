@@ -4,6 +4,7 @@
 
 // vector and vector for pointer vectors
 #include <vector>
+#include <unordered_set>
 
 // Common header
 #include "common.h"
@@ -96,6 +97,8 @@ namespace matrixMapp {
     matrixIter AdjEnding(particle_t &);
 
     // Get methods: coordinates of a particle in rows and colums
+
+    int flattenRow(int rowNum, particle_t * buf, std::unordered_set<particle_t*> & m);
     int getRow(particle_t &);
     int getCol(particle_t &);
 

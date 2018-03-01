@@ -4,6 +4,7 @@
 #include <iostream>
 #include <vector>
 #include <algorithm>
+#include <unordered_set>
 
 // Definition of the newspace associated with the matrix/grid
 namespace matrixMapp {
@@ -120,10 +121,10 @@ namespace matrixMapp {
     }
 
     void matrixCells::clear_fringes(int proc_n) {
-        for (int i = 0; i < Nadjacents; i += rows_per_proc) {
-            int left_row_index = (proc_n - 1 - i) * rows_per_proc;
-            int right_row_index = (proc_n + 1 + i) * rows_per_proc;
-            for (int j = 0; j < ncols * rows_per_proc; j++) {
+        for (int i = 0; i < Nadjacents; i++) {
+            int left_row_index = proc_n * rows_per_proc - 1 - i;
+            int right_row_index = (proc_n + 1) * rows_per_proc + i;
+            for (int j = 0; j < ncols; j++) {
                 if (left_row_index >= 0) {
                     (*cells)[ncols * left_row_index + j]->clear();
                 }
@@ -184,6 +185,26 @@ namespace matrixMapp {
         return get_index(getRow(p), getCol(p));
     }
 
+
+    int matrixCells::flattenRow(int rowNum, particle_t * buf, std::unordered_set<particle_t*> & m) {
+        int numAdded = 0;
+        /* 
+        for (auto & p : m) {
+            if (getRow(*p) == rowNum) {
+                buf[numAdded] = *p;
+                numAdded++;
+            }
+        }*/
+       
+        for (int i = rowNum * ncols; i < (rowNum + 1) * ncols; i++) {
+            auto box = (*cells)[i];
+            for (particle_t* elem : *box) {
+                buf[numAdded] = *elem;
+                numAdded++;
+            }
+        }
+        return numAdded;
+    }
 
     // Get the row value of particle p inside the mesh
     int matrixCells::getRow(particle_t & p) {

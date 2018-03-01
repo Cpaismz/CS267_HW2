@@ -6,8 +6,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unordered_set>
+#include <unistd.h>
 #include "common.h"
 #include "matrixCells.h"
+
 
 //
 //  benchmarking program
@@ -19,6 +21,7 @@ int main( int argc, char **argv )
     double davg,dmin, absmin=1.0, absavg=0.0;
     double rdavg,rdmin;
     int rnavg;
+    int num_migrated = 0;
 
     if( find_option( argc, argv, "-h" ) >= 0 )
     {
@@ -42,7 +45,6 @@ int main( int argc, char **argv )
     MPI_Init( &argc, &argv );
     MPI_Comm_size( MPI_COMM_WORLD, &n_proc );
     MPI_Comm_rank( MPI_COMM_WORLD, &rank );
-
     //
     //  allocate generic resources
     //
@@ -71,6 +73,9 @@ int main( int argc, char **argv )
     }
     MPI_Bcast(particles, n, PARTICLE, 0, MPI_COMM_WORLD);
     matrixMapp::matrixCells* mesh = new matrixMapp::matrixCells(n, size, cutoff, n_proc);
+    if (rank == 0) {
+        std::cerr << mesh->get_adj() << " " << mesh->get_proc_rows() << std::endl;
+    }
     // a set of pointers... each to be individually malloced
     // my code is disgusting
     std::unordered_set<particle_t*> owned;
@@ -87,9 +92,15 @@ int main( int argc, char **argv )
     //
     int size;
     double simulation_time = read_timer( );
+    /*
+    char a[30];
+    sprintf(a, "outfiles/r%d.out", rank);
+    FILE* fptr = fopen(a, "w");
+
+    dup2(fileno(fptr), fileno(stdout));*/
     for( int step = 0; step < NSTEPS; step++ )
     {
-
+        //printf("a"); fflush(stdout);
         MPI_Barrier(MPI_COMM_WORLD);
         if( find_option( argc, argv, "-no" ) == -1 ) {
             size = owned.size();
@@ -103,6 +114,7 @@ int main( int argc, char **argv )
             }
         }
 
+        //printf("b"); fflush(stdout);
         //Correctness
         navg = 0;
         davg = 0.0;
@@ -115,27 +127,53 @@ int main( int argc, char **argv )
             if( rank == 0 && fsave && (step % SAVEFREQ) == 0 )
                 save( fsave, n, particles );
 
-        particle_t*  halo_buf = (particle_t*)malloc(sizeof(particle_t) * owned.size());
+        particle_t*  halo_buf = (particle_t*)malloc(sizeof(particle_t) * n);
         // only send the number of necessary rows, as opposed to all
-        int i = 0;
-        for (auto & a : owned) {
-            halo_buf[i] = *a;
-            i++;
-        }
-        MPI_Request* trash = (MPI_Request*)malloc(n_proc * sizeof(MPI_Request));
-        for (int i = 0; i < mesh->get_adj(); i += mesh->get_proc_rows()) {
-            
-            int left_addr = rank - i - 1;
-            int right_addr = rank + i + 1;
-            if (left_addr >= 0) {
-                MPI_Isend(halo_buf, owned.size(), PARTICLE, left_addr, 0, MPI_COMM_WORLD, &(trash[left_addr]));
-            }
-            if (right_addr < n_proc) {
-                MPI_Isend(halo_buf, owned.size(), PARTICLE, right_addr, 0, MPI_COMM_WORLD, &(trash[right_addr]));
-            }
-        }
-        free(trash);
+        /*
+         int i = 0;
+         for (auto & a : owned) {
+             halo_buf[i] = *a;
+             i++;
+         }*/
+ 
 
+        MPI_Request trash;
+        for (int i = 0; i < mesh->get_adj(); i += mesh->get_proc_rows()) { 
+            int rows_to_send = std::min(mesh->get_adj() - i * mesh->get_proc_rows(), mesh->get_proc_rows());
+            //TODO:
+            //printf("rts:%d ", rows_to_send); fflush(stdout);
+            int left_addr = rank - i - 1;
+            if (left_addr >= 0) {
+                
+                int prev = 0;
+                for (int i = 0; i < rows_to_send; i++) {
+                    int row_offset = mesh->get_row_offset(rank);
+                    prev += mesh->flattenRow(row_offset + i, halo_buf + prev, owned);
+                }
+                //printf("p: %d a: %d ", prev, owned.size());
+                MPI_Isend(halo_buf, prev, PARTICLE, left_addr, 0, MPI_COMM_WORLD, &trash);
+                
+                //MPI_Isend(halo_buf, owned.size(), PARTICLE, left_addr, 0, MPI_COMM_WORLD, &trash);
+            }
+            
+            int right_addr = rank + i + 1;
+            if (right_addr < n_proc) {
+            
+                int prev = 0;
+                for (int i = 0; i < rows_to_send; i++) {
+                    int row_offset = mesh->get_row_offset(rank);
+                    prev += mesh->flattenRow(row_offset + mesh->get_proc_rows() - i - 1, halo_buf + prev, owned);
+                }
+
+                //printf("p: %d a: %d ", prev, owned.size());
+                MPI_Isend(halo_buf, prev, PARTICLE, right_addr, 0, MPI_COMM_WORLD, &trash);
+                //MPI_Isend(halo_buf, owned.size(), PARTICLE, right_addr, 0, MPI_COMM_WORLD, &trash);
+            }
+
+
+        }
+
+        //printf("c"); fflush(stdout);
         particle_t*  rec_buf = (particle_t*)malloc(sizeof(particle_t) * n);
         int offset = 0;
         for (int i = 0; i < mesh->get_adj(); i += mesh->get_proc_rows()) {
@@ -156,11 +194,13 @@ int main( int argc, char **argv )
                 offset += num_rec;
             }
         }
+
         push2Mesh(offset, rec_buf, mesh);
         //
         //  compute all forces
         //
 
+        //printf("d"); fflush(stdout);
         for (auto & part : owned) {
             part->ax = part->ay = 0;
 
@@ -170,12 +210,16 @@ int main( int argc, char **argv )
                 // calling function by modifying non-const ref to part :(
                 apply_force(*part, **adjIter, &dmin, &davg, &navg);
             }
+            
         }
 
         MPI_Barrier(MPI_COMM_WORLD);
         mesh->clear_fringes(rank);
         free(rec_buf);
         free(halo_buf);
+        /*
+        free(halo_cts);
+        free(halo_acc);*/
 
         if( find_option( argc, argv, "-no" ) == -1 )
         {
@@ -216,6 +260,8 @@ int main( int argc, char **argv )
                 }
             }
         }
+
+
         std::vector<particle_t> migrated;
         for (auto a : to_del) {
             migrated.push_back(*a);
@@ -223,10 +269,10 @@ int main( int argc, char **argv )
             free(a);
         }
         // TODO: this is still an all-to-all broadcast, but only of the particles that moved
+        //printf("e"); fflush(stdout);
 
         size = migrated.size();
         MPI_Allgather(&size, 1, MPI::INT, migrated_sizes, 1, MPI::INT, MPI_COMM_WORLD);
-
 
         disp_sizes[0] = 0;
         for (int i = 1; i < n_proc; i++) {
@@ -237,9 +283,12 @@ int main( int argc, char **argv )
         for (int i = 0; i < n_proc; i++) {
             tot_migrated += migrated_sizes[i];
         }
-
+        if (rank == 0) {
+            num_migrated += tot_migrated;
+        }
         MPI_Allgatherv(&(migrated[0]), migrated.size(), PARTICLE, particles, migrated_sizes, disp_sizes, PARTICLE, MPI_COMM_WORLD );
 
+        //printf("mig:%d ", tot_migrated);
         push2Set(tot_migrated, particles, mesh, owned, rank);
     }
     simulation_time = read_timer( ) - simulation_time;
@@ -249,8 +298,8 @@ int main( int argc, char **argv )
     }
 
     if (rank == 0) {
-      printf( "n = %d, simulation time = %g seconds", n, simulation_time);
-
+      printf( "n = %d, simulation time = %g seconds,", n, simulation_time);
+      printf( " %f parts migrated per step", (double)num_migrated / NSTEPS );
       if( find_option( argc, argv, "-no" ) == -1 )
       {
         if (nabsavg) absavg /= nabsavg;
