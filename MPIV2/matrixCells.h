@@ -108,7 +108,7 @@ namespace matrixMapp {
     int get_row_offset(int proc_n);
     int get_proc_rows();
     bool owns_particle(particle_t& p, int proc_n);
-
+    int get_owner(particle_t& p);
     // Private elements
     private:
         // Rows and columns

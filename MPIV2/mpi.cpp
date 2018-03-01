@@ -85,10 +85,23 @@ int main( int argc, char **argv )
     //
     //  simulate a number of time steps
     //
-
+    int size;
     double simulation_time = read_timer( );
     for( int step = 0; step < NSTEPS; step++ )
     {
+
+        MPI_Barrier(MPI_COMM_WORLD);
+
+        size = owned.size();
+        MPI_Allgather(&size, 1, MPI::INT, migrated_sizes, 1, MPI::INT, MPI_COMM_WORLD);
+        int sum = 0;
+        for (int i = 0; i < n_proc; i++) {
+            sum += migrated_sizes[i];
+        }
+        if (sum != n) {
+            std::cerr << "wrong size" << std::endl;
+        }
+
         //Correctness
         navg = 0;
         davg = 0.0;
@@ -108,16 +121,19 @@ int main( int argc, char **argv )
             halo_buf[i] = *a;
             i++;
         }
+        MPI_Request* trash = (MPI_Request*)malloc(n_proc * sizeof(MPI_Request));
         for (int i = 0; i < mesh->get_adj(); i += mesh->get_proc_rows()) {
+            
             int left_addr = rank - i - 1;
             int right_addr = rank + i + 1;
             if (left_addr >= 0) {
-                MPI_Send(halo_buf, owned.size(), PARTICLE, left_addr, 0, MPI_COMM_WORLD);
+                MPI_Isend(halo_buf, owned.size(), PARTICLE, left_addr, 0, MPI_COMM_WORLD, &(trash[left_addr]));
             }
             if (right_addr < n_proc) {
-                MPI_Send(halo_buf, owned.size(), PARTICLE, right_addr, 0, MPI_COMM_WORLD);
+                MPI_Isend(halo_buf, owned.size(), PARTICLE, right_addr, 0, MPI_COMM_WORLD, &(trash[right_addr]));
             }
         }
+        free(trash);
 
         particle_t*  rec_buf = (particle_t*)malloc(sizeof(particle_t) * n);
         int offset = 0;
@@ -179,11 +195,10 @@ int main( int argc, char **argv )
           }
         }
 
-
         //
         //  move particles
         //
-        std::vector<particle_t *> migrated;
+        std::vector<particle_t *> to_del;
 
         for (auto & part : owned) {
             int old_index = mesh->get_index(*part);
@@ -194,14 +209,23 @@ int main( int argc, char **argv )
                 if (mesh->owns_particle(*part, rank)) {
                     mesh->insert(*part);
                 } else {
-                    migrated.push_back(part);
+                    to_del.push_back(part);
+
                 }
             }
         }
-
+        std::vector<particle_t> migrated;
+        for (auto a : to_del) {
+            migrated.push_back(*a);
+            owned.erase(a);
+            free(a);
+        }
         // TODO: this is still an all-to-all broadcast, but only of the particles that moved
-        int size = migrated.size();
+
+        size = migrated.size();
         MPI_Allgather(&size, 1, MPI::INT, migrated_sizes, 1, MPI::INT, MPI_COMM_WORLD);
+
+
         disp_sizes[0] = 0;
         for (int i = 1; i < n_proc; i++) {
             disp_sizes[i] = disp_sizes[i-1] + migrated_sizes[i-1];
@@ -215,13 +239,8 @@ int main( int argc, char **argv )
         MPI_Allgatherv(&(migrated[0]), migrated.size(), PARTICLE, particles, migrated_sizes, disp_sizes, PARTICLE, MPI_COMM_WORLD );
 
         push2Set(tot_migrated, particles, mesh, owned, rank);
-        for (auto a : migrated) {
-            free(a);
-        }
-
     }
     simulation_time = read_timer( ) - simulation_time;
-    std::cerr<< "finished sim" << std::endl;
 
     if (rank == 0) {
       printf( "n = %d, simulation time = %g seconds", n, simulation_time);

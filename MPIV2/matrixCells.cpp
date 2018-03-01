@@ -120,10 +120,10 @@ namespace matrixMapp {
     }
 
     void matrixCells::clear_fringes(int proc_n) {
-        for (int i = 0; i < Nadjacents; i++) {
-            int left_row_index = proc_n * rows_per_proc - i - 1;
-            int right_row_index = (proc_n + 1) * rows_per_proc + i;
-            for (int j = 0; j < ncols; j++) {
+        for (int i = 0; i < Nadjacents; i += rows_per_proc) {
+            int left_row_index = (proc_n - 1 - i) * rows_per_proc;
+            int right_row_index = (proc_n + 1 + i) * rows_per_proc;
+            for (int j = 0; j < ncols * rows_per_proc; j++) {
                 if (left_row_index >= 0) {
                     (*cells)[ncols * left_row_index + j]->clear();
                 }
@@ -188,6 +188,10 @@ namespace matrixMapp {
     // Get the row value of particle p inside the mesh
     int matrixCells::getRow(particle_t & p) {
         int row = static_cast<int>(p.y / msize);
+        if (row == nrows) {
+            row = nrows - 1;
+        }
+
         assert(row < nrows);
         return row;
     }
@@ -212,14 +216,22 @@ namespace matrixMapp {
         return rows_per_proc;
     }
 
-    bool matrixCells::owns_particle(particle_t& p, int proc_n) {
+    int matrixCells::get_owner(particle_t& p) {  
         int p_row = getRow(p);
-        return p_row >= get_row_offset(proc_n) && p_row < get_row_offset(proc_n) + rows_per_proc;
+        return p_row / rows_per_proc;
+    }
+
+    bool matrixCells::owns_particle(particle_t& p, int proc_n) {
+        return get_owner(p) == proc_n;
     }
 
     // Get the column value of particle p inside the mesh
     int matrixCells::getCol(particle_t & p) {
         int col = static_cast<int>(p.x / msize);
+
+        if (col == ncols) {
+            col = ncols - 1;
+        }
         assert(col < ncols);
         return col;
     }
