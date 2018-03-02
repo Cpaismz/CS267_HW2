@@ -2,6 +2,7 @@
 #include <assert.h>
 #include <iostream>
 #include <math.h>
+#include <ctime>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -96,12 +97,14 @@ int main( int argc, char **argv )
     char a[30];
     sprintf(a, "outfiles/r%d.out", rank);
     FILE* fptr = fopen(a, "w");
-
+    
     dup2(fileno(fptr), fileno(stdout));*/
+    double tot_time = 0.0;
     for( int step = 0; step < NSTEPS; step++ )
     {
         //printf("a"); fflush(stdout);
         MPI_Barrier(MPI_COMM_WORLD);
+        clock_t begin_time = clock();
         if( find_option( argc, argv, "-no" ) == -1 ) {
             size = owned.size();
             MPI_Allgather(&size, 1, MPI::INT, migrated_sizes, 1, MPI::INT, MPI_COMM_WORLD);
@@ -196,6 +199,8 @@ int main( int argc, char **argv )
         }
 
         push2Mesh(offset, rec_buf, mesh);
+
+        tot_time += float(clock() - begin_time)/CLOCKS_PER_SEC;
         //
         //  compute all forces
         //
@@ -214,6 +219,7 @@ int main( int argc, char **argv )
         }
 
         MPI_Barrier(MPI_COMM_WORLD);
+
         mesh->clear_fringes(rank);
         free(rec_buf);
         free(halo_buf);
@@ -268,6 +274,8 @@ int main( int argc, char **argv )
             owned.erase(a);
             free(a);
         }
+
+        begin_time = clock();
         // TODO: this is still an all-to-all broadcast, but only of the particles that moved
         //printf("e"); fflush(stdout);
 
@@ -288,6 +296,8 @@ int main( int argc, char **argv )
         }
         MPI_Allgatherv(&(migrated[0]), migrated.size(), PARTICLE, particles, migrated_sizes, disp_sizes, PARTICLE, MPI_COMM_WORLD );
 
+        tot_time += float(clock() - begin_time)/CLOCKS_PER_SEC;
+        
         //printf("mig:%d ", tot_migrated);
         push2Set(tot_migrated, particles, mesh, owned, rank);
     }
@@ -297,7 +307,13 @@ int main( int argc, char **argv )
         free(a);
     }
 
+    if (rank == 1) {
+        printf("total sync time: %f\n", tot_time);
+    }
+
+    MPI_Barrier(MPI_COMM_WORLD);
     if (rank == 0) {
+
       printf( "n = %d, simulation time = %g seconds,", n, simulation_time);
       printf( " %f parts migrated per step", (double)num_migrated / NSTEPS );
       if( find_option( argc, argv, "-no" ) == -1 )
