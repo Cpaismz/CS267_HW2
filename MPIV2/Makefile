@@ -1,4 +1,4 @@
-CC = mpicxx
+CC = CC
 MPCC = CC
 OPENMP = -openmp
 CFLAGS = -O3 -std=c++11
